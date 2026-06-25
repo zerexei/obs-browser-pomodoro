@@ -228,7 +228,7 @@
         <div class="timer-text" id="time">00:00</div>
       </div>
 
-      <div class="mode" id="mode">work</div>
+      <div class="mode" id="mode">Work</div>
 
       <div class="stats">
         <span>💼 <b id="workCount">0</b></span>
@@ -262,40 +262,76 @@
 
       const CYCLE = ["work", "short", "work", "short", "work", "long"];
 
+      const el = {
+        time: document.getElementById("time"),
+        mode: document.getElementById("mode"),
+        progress: document.getElementById("progress"),
+        toggleBtn: document.getElementById("toggleBtn"),
+        circleWrap: document.getElementById("circleWrap"),
+        tasks: document.getElementById("tasks"),
+        taskInput: document.getElementById("taskInput"),
+      };
+
+      const sounds = {
+        work: new Audio("./notifications/stomps.mp3"),
+        short: new Audio("./notifications/clap.mp3"),
+        long: new Audio("./notifications/crowd-cheers.mp3"),
+      };
+
       let state = JSON.parse(localStorage.getItem("cleanUI")) || {
         cycleIndex: 0,
         timeLeft: MODES.work,
         running: false,
         workCount: 0,
         breakCount: 0,
-        doneCount: 0,
         tasks: [],
       };
 
       let interval = null;
 
       /* DISPLAY */
-      function updateDisplay() {
+      const updateDisplay = () => {
         let m = Math.floor(state.timeLeft / 60)
           .toString()
           .padStart(2, "0");
         let s = (state.timeLeft % 60).toString().padStart(2, "0");
-        document.getElementById("time").innerText = `${m}:${s}`;
 
-        let mode = CYCLE[state.cycleIndex];
-        document.getElementById("mode").innerText = mode;
+        el.time.innerText = `${m}:${s}`;
+
+        const mode = CYCLE[state.cycleIndex];
+
+        const labels = {
+          work: "Work",
+          short: "Short Break",
+          long: "Long Break",
+        };
+
+        el.mode.innerText = labels[mode];
 
         let total = MODES[mode];
         let progress = state.timeLeft / total;
 
         let c = 2 * Math.PI * 85;
-        document.getElementById("progress").style.strokeDasharray = c;
-        document.getElementById("progress").style.strokeDashoffset =
-          c * progress;
-      }
+        el.progress.style.strokeDasharray = c;
+        el.progress.style.strokeDashoffset = c * progress;
+      };
+
+      const playModeSound = (mode) => {
+        sounds[mode].currentTime = 0;
+        sounds[mode].play();
+      };
+
+      /* CYCLE */
+      const nextCycle = () => {
+        state.cycleIndex = (state.cycleIndex + 1) % CYCLE.length;
+        const nextMode = CYCLE[state.cycleIndex];
+
+        playModeSound(nextMode);
+        state.timeLeft = MODES[nextMode];
+      };
 
       /* TIMER */
-      function tick() {
+      const tick = () => {
         if (!state.running) return;
 
         if (state.timeLeft > 0) state.timeLeft--;
@@ -309,31 +345,32 @@
         updateStats();
         updateDisplay();
         save();
-      }
+      };
 
-      function toggleTimer() {
+      const toggleTimer = () => {
         if (state.running) {
           state.running = false;
           clearInterval(interval);
           interval = null;
-          document.getElementById("circleWrap").classList.remove("running");
-          document.getElementById("toggleBtn").innerText = "Start";
+          el.circleWrap.classList.remove("running");
+          el.toggleBtn.innerText = "Start";
         } else {
           state.running = true;
           if (!interval) interval = setInterval(tick, 1000);
-          document.getElementById("circleWrap").classList.add("running");
-          document.getElementById("toggleBtn").innerText = "Pause";
+          el.circleWrap.classList.add("running");
+          el.toggleBtn.innerText = "Pause";
         }
-      }
+      };
 
-      function reset() {
+      const reset = () => {
         let mode = CYCLE[state.cycleIndex];
         state.timeLeft = MODES[mode];
         updateDisplay();
-      }
+        save();
+      };
 
       /* HARD RESET */
-      function hardReset() {
+      const hardReset = () => {
         state.running = false;
         clearInterval(interval);
         interval = null;
@@ -344,87 +381,80 @@
           running: false,
           workCount: 0,
           breakCount: 0,
-          doneCount: 0,
           tasks: [],
         };
 
-        document.getElementById("toggleBtn").innerText = "Start";
-        document.getElementById("circleWrap").classList.remove("running");
+        el.toggleBtn.innerText = "Start";
+        el.circleWrap.classList.remove("running");
 
         updateDisplay();
         updateStats();
         renderTasks();
         save();
-      }
+      };
 
-      /* CYCLE */
-      function nextCycle() {
-        state.cycleIndex = (state.cycleIndex + 1) % CYCLE.length;
-        state.timeLeft = MODES[CYCLE[state.cycleIndex]];
-      }
+      /* STATS */
+      const updateStats = () => {
+        const done = state.tasks.filter((t) => t.done).length;
+
+        document.getElementById("workCount").innerText = state.workCount;
+        document.getElementById("breakCount").innerText = state.breakCount;
+        document.getElementById("doneCount").innerText = done;
+      };
 
       /* TASKS */
-      function renderTasks() {
-        let el = document.getElementById("tasks");
-        el.innerHTML = "";
+      const renderTasks = () => {
+        el.tasks.innerHTML = "";
 
         let sorted = [...state.tasks].sort((a, b) => a.done - b.done);
 
         sorted.forEach((t) => {
-          let realIndex = state.tasks.indexOf(t);
+          let i = state.tasks.indexOf(t);
 
           let div = document.createElement("div");
           div.className = "task" + (t.done ? " done" : "");
 
           div.innerHTML = `
-      <span>${t.name}</span>
-      <div>
-        <button class="icon-btn" onclick="toggleDone(${realIndex})">✔</button>
-        <button class="icon-btn" onclick="deleteTask(${realIndex})">🗑</button>
-      </div>
-    `;
-          el.appendChild(div);
+            <span>${t.name}</span>
+            <div>
+              <button class="icon-btn" onclick="toggleDone(${i})">✔</button>
+              <button class="icon-btn" onclick="deleteTask(${i})">🗑</button>
+            </div>
+          `;
+          el.tasks.appendChild(div);
         });
-      }
+      };
 
-      function addTask() {
-        let input = document.getElementById("taskInput");
-        if (!input.value) return;
+      const addTask = () => {
+        const name = el.taskInput.value.trim();
+        if (!name) return;
 
-        state.tasks.unshift({ name: input.value, done: false });
-        input.value = "";
+        state.tasks.unshift({ name, done: false });
+        el.taskInput.value = "";
+        el.taskInput.focus();
 
         renderTasks();
         save();
-      }
+      };
 
-      function toggleDone(i) {
+      const toggleDone = (i) => {
         state.tasks[i].done = !state.tasks[i].done;
-        state.doneCount = state.tasks.filter((t) => t.done).length;
         renderTasks();
         updateStats();
         save();
-      }
+      };
 
-      function deleteTask(i) {
+      const deleteTask = (i) => {
         state.tasks.splice(i, 1);
-        state.doneCount = state.tasks.filter((t) => t.done).length;
         renderTasks();
         updateStats();
         save();
-      }
-
-      /* STATS */
-      function updateStats() {
-        document.getElementById("workCount").innerText = state.workCount;
-        document.getElementById("breakCount").innerText = state.breakCount;
-        document.getElementById("doneCount").innerText = state.doneCount;
-      }
+      };
 
       /* STORAGE */
-      function save() {
+      const save = () => {
         localStorage.setItem("cleanUI", JSON.stringify(state));
-      }
+      };
 
       /* INIT */
       updateDisplay();

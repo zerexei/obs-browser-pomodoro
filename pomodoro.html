@@ -1,0 +1,435 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>AD. Work Timer</title>
+
+    <style>
+      :root {
+        --accent: #55ffff;
+        --bg: rgba(10, 15, 20, 0.35);
+        --text: #eaffff;
+      }
+
+      body {
+        margin: 0;
+        background: transparent;
+        font-family: "Segoe UI", sans-serif;
+        color: var(--text);
+      }
+
+      #app {
+        position: relative;
+        width: 360px;
+        padding: 14px;
+        border-radius: 16px;
+        background: var(--bg);
+        backdrop-filter: blur(14px);
+        box-shadow: 0 0 30px rgba(85, 255, 255, 0.15);
+      }
+
+      /* HARD RESET BUTTON */
+      #hardResetBtn {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        font-size: 12px;
+        padding: 4px 6px;
+        opacity: 0.6;
+      }
+      #hardResetBtn:hover {
+        opacity: 1;
+      }
+
+      /* TIMER */
+      .circle {
+        position: relative;
+        width: 200px;
+        height: 200px;
+        margin: auto;
+      }
+
+      svg {
+        transform: rotate(-90deg);
+      }
+
+      circle {
+        fill: none;
+        stroke-width: 10;
+      }
+
+      .bg {
+        stroke: rgba(255, 255, 255, 0.05);
+      }
+
+      .progress {
+        stroke: var(--accent);
+        stroke-linecap: round;
+        transition: stroke-dashoffset 0.6s linear;
+        filter: drop-shadow(0 0 10px var(--accent));
+      }
+
+      .timer-text {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        font-size: 38px;
+        font-weight: bold;
+        text-shadow: 0 0 15px var(--accent);
+      }
+
+      .mode {
+        text-align: center;
+        margin-top: 6px;
+        font-size: 14px;
+        opacity: 0.85;
+      }
+
+      /* STATS */
+      .stats {
+        display: flex;
+        justify-content: center;
+        gap: 16px;
+        margin-top: 8px;
+        font-size: 16px;
+      }
+
+      .stats span {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+
+      /* CONTROLS */
+      .controls {
+        text-align: center;
+        margin-top: 10px;
+      }
+
+      button {
+        background: rgba(85, 255, 255, 0.08);
+        border: 1px solid rgba(85, 255, 255, 0.5);
+        color: var(--text);
+        padding: 6px 12px;
+        margin: 3px;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: 0.2s;
+      }
+
+      button:hover {
+        background: rgba(85, 255, 255, 0.25);
+        box-shadow: 0 0 10px var(--accent);
+      }
+
+      /* TASK INPUT */
+      .task-input {
+        display: flex;
+        gap: 6px;
+        margin-top: 12px;
+      }
+
+      #taskInput {
+        flex: 1;
+        padding: 6px;
+        border-radius: 8px;
+        border: none;
+        background: rgba(255, 255, 255, 0.06);
+        color: var(--text);
+      }
+
+      /* TASK LIST */
+      #tasks {
+        max-height: 300px;
+        overflow-y: auto;
+        margin-top: 6px;
+        padding-right: 4px;
+      }
+
+      /* subtle scrollbar */
+      #tasks::-webkit-scrollbar {
+        width: 4px;
+      }
+      #tasks::-webkit-scrollbar-thumb {
+        background: rgba(85, 255, 255, 0.2);
+        border-radius: 10px;
+      }
+      #tasks::-webkit-scrollbar-thumb:hover {
+        background: rgba(85, 255, 255, 0.4);
+      }
+      #tasks {
+        scrollbar-width: thin;
+        scrollbar-color: rgba(85, 255, 255, 0.2) transparent;
+      }
+
+      .task {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 6px;
+        padding: 8px;
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.04);
+      }
+
+      .task span {
+        flex: 1;
+        font-size: 13px;
+      }
+
+      .task.done span {
+        text-decoration: line-through;
+        opacity: 0.5;
+      }
+
+      .icon-btn {
+        border: none;
+        background: none;
+        font-size: 14px;
+        cursor: pointer;
+        opacity: 0.7;
+      }
+
+      .icon-btn:hover {
+        opacity: 1;
+        text-shadow: 0 0 6px var(--accent);
+      }
+
+      /* RUNNING */
+      .running .progress {
+        animation: pulse 1.5s infinite;
+      }
+
+      @keyframes pulse {
+        0% {
+          filter: drop-shadow(0 0 5px var(--accent));
+        }
+        50% {
+          filter: drop-shadow(0 0 20px var(--accent));
+        }
+        100% {
+          filter: drop-shadow(0 0 5px var(--accent));
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <div id="app">
+      <!-- HARD RESET -->
+      <button id="hardResetBtn" onclick="hardReset()">⟲</button>
+
+      <div class="circle" id="circleWrap">
+        <svg width="200" height="200">
+          <circle class="bg" cx="100" cy="100" r="85" />
+          <circle id="progress" class="progress" cx="100" cy="100" r="85" />
+        </svg>
+        <div class="timer-text" id="time">00:00</div>
+      </div>
+
+      <div class="mode" id="mode">work</div>
+
+      <div class="stats">
+        <span>💼 <b id="workCount">0</b></span>
+        <span>☕ <b id="breakCount">0</b></span>
+        <span>✔ <b id="doneCount">0</b></span>
+      </div>
+
+      <div class="controls">
+        <button id="toggleBtn" onclick="toggleTimer()">Start</button>
+        <button onclick="reset()">Reset</button>
+      </div>
+
+      <div class="task-input">
+        <input
+          id="taskInput"
+          placeholder="New task..."
+          onkeydown="if (event.key === 'Enter') addTask();"
+        />
+        <button onclick="addTask()">+</button>
+      </div>
+
+      <div id="tasks"></div>
+    </div>
+
+    <script>
+      const MODES = {
+        work: 5400, // 90 min
+        short: 900, // 15 min
+        long: 1800, // 30 min
+      };
+
+      const CYCLE = ["work", "short", "work", "short", "work", "long"];
+
+      let state = JSON.parse(localStorage.getItem("cleanUI")) || {
+        cycleIndex: 0,
+        timeLeft: MODES.work,
+        running: false,
+        workCount: 0,
+        breakCount: 0,
+        doneCount: 0,
+        tasks: [],
+      };
+
+      let interval = null;
+
+      /* DISPLAY */
+      function updateDisplay() {
+        let m = Math.floor(state.timeLeft / 60)
+          .toString()
+          .padStart(2, "0");
+        let s = (state.timeLeft % 60).toString().padStart(2, "0");
+        document.getElementById("time").innerText = `${m}:${s}`;
+
+        let mode = CYCLE[state.cycleIndex];
+        document.getElementById("mode").innerText = mode;
+
+        let total = MODES[mode];
+        let progress = state.timeLeft / total;
+
+        let c = 2 * Math.PI * 85;
+        document.getElementById("progress").style.strokeDasharray = c;
+        document.getElementById("progress").style.strokeDashoffset =
+          c * progress;
+      }
+
+      /* TIMER */
+      function tick() {
+        if (!state.running) return;
+
+        if (state.timeLeft > 0) state.timeLeft--;
+        else {
+          let mode = CYCLE[state.cycleIndex];
+          if (mode === "work") state.workCount++;
+          else state.breakCount++;
+          nextCycle();
+        }
+
+        updateStats();
+        updateDisplay();
+        save();
+      }
+
+      function toggleTimer() {
+        if (state.running) {
+          state.running = false;
+          clearInterval(interval);
+          interval = null;
+          document.getElementById("circleWrap").classList.remove("running");
+          document.getElementById("toggleBtn").innerText = "Start";
+        } else {
+          state.running = true;
+          if (!interval) interval = setInterval(tick, 1000);
+          document.getElementById("circleWrap").classList.add("running");
+          document.getElementById("toggleBtn").innerText = "Pause";
+        }
+      }
+
+      function reset() {
+        let mode = CYCLE[state.cycleIndex];
+        state.timeLeft = MODES[mode];
+        updateDisplay();
+      }
+
+      /* HARD RESET */
+      function hardReset() {
+        state.running = false;
+        clearInterval(interval);
+        interval = null;
+
+        state = {
+          cycleIndex: 0,
+          timeLeft: MODES.work,
+          running: false,
+          workCount: 0,
+          breakCount: 0,
+          doneCount: 0,
+          tasks: [],
+        };
+
+        document.getElementById("toggleBtn").innerText = "Start";
+        document.getElementById("circleWrap").classList.remove("running");
+
+        updateDisplay();
+        updateStats();
+        renderTasks();
+        save();
+      }
+
+      /* CYCLE */
+      function nextCycle() {
+        state.cycleIndex = (state.cycleIndex + 1) % CYCLE.length;
+        state.timeLeft = MODES[CYCLE[state.cycleIndex]];
+      }
+
+      /* TASKS */
+      function renderTasks() {
+        let el = document.getElementById("tasks");
+        el.innerHTML = "";
+
+        let sorted = [...state.tasks].sort((a, b) => a.done - b.done);
+
+        sorted.forEach((t) => {
+          let realIndex = state.tasks.indexOf(t);
+
+          let div = document.createElement("div");
+          div.className = "task" + (t.done ? " done" : "");
+
+          div.innerHTML = `
+      <span>${t.name}</span>
+      <div>
+        <button class="icon-btn" onclick="toggleDone(${realIndex})">✔</button>
+        <button class="icon-btn" onclick="deleteTask(${realIndex})">🗑</button>
+      </div>
+    `;
+          el.appendChild(div);
+        });
+      }
+
+      function addTask() {
+        let input = document.getElementById("taskInput");
+        if (!input.value) return;
+
+        state.tasks.unshift({ name: input.value, done: false });
+        input.value = "";
+
+        renderTasks();
+        save();
+      }
+
+      function toggleDone(i) {
+        state.tasks[i].done = !state.tasks[i].done;
+        state.doneCount = state.tasks.filter((t) => t.done).length;
+        renderTasks();
+        updateStats();
+        save();
+      }
+
+      function deleteTask(i) {
+        state.tasks.splice(i, 1);
+        state.doneCount = state.tasks.filter((t) => t.done).length;
+        renderTasks();
+        updateStats();
+        save();
+      }
+
+      /* STATS */
+      function updateStats() {
+        document.getElementById("workCount").innerText = state.workCount;
+        document.getElementById("breakCount").innerText = state.breakCount;
+        document.getElementById("doneCount").innerText = state.doneCount;
+      }
+
+      /* STORAGE */
+      function save() {
+        localStorage.setItem("cleanUI", JSON.stringify(state));
+      }
+
+      /* INIT */
+      updateDisplay();
+      updateStats();
+      renderTasks();
+    </script>
+  </body>
+</html>
